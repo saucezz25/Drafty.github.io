@@ -4,7 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Drafty</title>
-  
+
+  <!-- VINCULACIÓN DEL MANIFIESTO Y SERVICE WORKER PARA PWABUILDER -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#A2C2FB" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Drafty" />
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+
+  <!-- Tipografía -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
@@ -50,7 +66,6 @@
       overflow: hidden;
     }
 
-    /* Tamaño visual en pantalla: fluido y nítido */
     #canvas-wrapper {
       position: relative;
       width: 360px;
@@ -434,7 +449,7 @@
   </div>
 
   <script>
-    // RESOLUCIÓN HD REAL (1080 x 1620 px para impresión y nitidez total)
+    // RESOLUCIÓN HD REAL (1080 x 1620 px)
     const HD_WIDTH = 1080;
     const HD_HEIGHT = 1620;
 
@@ -465,7 +480,6 @@
       canvas.className = 'drawing-layer';
       const ctx = canvas.getContext('2d', { alpha: true });
       
-      // Fondo blanco solo para la primera capa
       if(state.layers.length === 0) {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, HD_WIDTH, HD_HEIGHT);
@@ -500,7 +514,6 @@
       return state.layers[state.currentLayerIdx]?.ctx;
     }
 
-    // Conversión de coordenadas de pantalla a HD real
     function getHDCoords(e) {
       const rect = canvasWrapper.getBoundingClientRect();
       const scaleX = HD_WIDTH / rect.width;
@@ -511,7 +524,7 @@
       };
     }
 
-    // --- MOTOR DE TRAZO SUAVE Y OPTIMIZADO (SIN LAG) ---
+    // MOTOR DE TRAZO FLUIDO
     canvasWrapper.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
@@ -531,7 +544,6 @@
       let pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
       pressureIndicator.innerText = `${Math.round(pressure * 100)}%`;
 
-      // Trazar punto inicial al tocar
       const ctx = currentCtx();
       if (!ctx) return;
       const strokeWidth = state.size * 3 * pressure;
@@ -563,14 +575,12 @@
 
       applyToolStyle(ctx, strokeWidth);
 
-      // Suavizado dinámico por curva Bézier (evita esquinas y aceleración rápida)
       if (state.points.length > 2) {
         const p1 = state.points[state.points.length - 2];
         const p2 = state.points[state.points.length - 1];
         const midPoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
 
         if (state.tool === 'crayon') {
-          // Textura de crayón rápida
           ctx.fillStyle = state.color;
           const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
           for (let i = 0; i < dist; i += 4) {
@@ -628,7 +638,7 @@
       }
     }
 
-    // HISTORIAL DESHACER / REHACER
+    // HISTORIAL SEGURO
     function saveState() {
       try {
         const c = state.layers[state.currentLayerIdx]?.canvas;
@@ -682,7 +692,7 @@
     document.getElementById('colorPicker').oninput = (e) => state.color = e.target.value;
     document.getElementById('brushSize').oninput = (e) => state.size = e.target.value;
 
-    // FOTO REFERENCIA
+    // REFERENCIA
     const refPanel = document.getElementById('refPanel');
     const refDragHandle = document.getElementById('refDragHandle');
     document.getElementById('toggleRefBtn').onclick = () => refPanel.classList.toggle('hidden');
@@ -719,7 +729,7 @@
     document.getElementById('layersBtn').onclick = () => document.getElementById('layersPanel').classList.toggle('open');
     document.getElementById('addLayerBtn').onclick = addLayer;
 
-    // GUARDADO HD EN DISPOSITIVO Y CUADERNO
+    // GUARDADO HD
     const bookModal = document.getElementById('bookModal');
     document.getElementById('openBookBtn').onclick = () => {
       renderBook();
@@ -733,19 +743,15 @@
       exp.height = HD_HEIGHT;
       const ctx = exp.getContext('2d');
       
-      // Combinar todas las capas en máxima calidad
       state.layers.forEach(l => ctx.drawImage(l.canvas, 0, 0));
-      
       const fullQualityUrl = exp.toDataURL('image/png', 1.0);
 
-      // Guardar en almacenamiento local para el libro
       try {
         let pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
         pages.unshift({ id: Date.now(), img: fullQualityUrl, date: new Date().toLocaleDateString() });
         localStorage.setItem('drafty_hd_pages', JSON.stringify(pages.slice(0, 10)));
       } catch(e) {}
 
-      // Descargar directamente en el celular en 1080p
       const a = document.createElement('a');
       a.download = `Drafty_HD_${Date.now()}.png`;
       a.href = fullQualityUrl;
@@ -764,10 +770,21 @@
         d.className = 'page-card';
         d.innerHTML = `<img src="${p.img}" /><span style="font-size:10px; color:#64748B;">${p.date}</span>`;
         grid.appendChild(d);
+      });<!-- Conexión del Manifiesto y tema -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#A2C2FB" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- Registro del Service Worker para PWABuilder -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
       });
     }
+  </script>
+    }
 
-    // Iniciar con la primera capa HD
     addLayer();
   </script>
 </body>
