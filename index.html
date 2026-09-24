@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Drafty</title>
 
-  <!-- VINCULACIÓN DEL MANIFIESTO Y SERVICE WORKER PARA PWABUILDER -->
+  <!-- VINCULACIÓN PARA PWABUILDER / APK -->
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#A2C2FB" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -14,8 +14,8 @@
 
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js');
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').catch(function(e){ console.log(e); });
       });
     }
   </script>
@@ -86,7 +86,7 @@
       width: 100%;
       height: 100%;
       border-radius: 16px;
-      touch-action: none;
+      pointer-events: none; /* Los toques van directo al lienzo */
     }
 
     /* BARRA SUPERIOR */
@@ -383,7 +383,7 @@
     <div class="brand">
       <span style="font-size: 22px;">🎨</span>
       <span class="brand-title">Drafty</span>
-      <span id="pressureIndicator" style="font-size: 11px; background: #EBF2FF; color: #4A5568; padding: 2px 8px; border-radius: 12px;">100%</span>
+      <span id="versionBadge" style="font-size: 11px; background: #D1FAE5; color: #065F46; padding: 2px 7px; border-radius: 12px; font-weight: 600;">v3 HD 🟢</span>
     </div>
 
     <div class="top-actions">
@@ -419,7 +419,8 @@
 
   <div class="tool-settings">
     <input type="color" id="colorPicker" class="color-picker-bubble" value="#2D3748">
-    <input type="range" id="brushSize" class="brush-slider" min="2" max="60" value="10">
+    <input type="range" id="brushSize" class="brush-slider" min="2" max="50" value="8">
+    <span id="pressureIndicator" style="font-size: 11px; color: #64748B;">Stylus: 100%</span>
   </div>
 
   <nav class="bottom-dock">
@@ -427,7 +428,7 @@
     <button class="tool-btn" data-tool="marker" type="button" title="Marcador">🖊️</button>
     <button class="tool-btn" data-tool="crayon" type="button" title="Crayón">🖍️</button>
     <button class="tool-btn" data-tool="eraser" type="button" title="Borrador">🧹</button>
-    <button class="tool-btn" data-tool="pan" type="button" title="Mover Lienzo">✋</button>
+    <button class="tool-btn" data-tool="pan" type="button" title="Mover">✋</button>
   </nav>
 
   <div class="book-modal" id="bookModal">
@@ -440,7 +441,7 @@
         </div>
         <div style="margin-top:12px;">
           <button class="pill-btn" id="savePageBtn" type="button" style="background: var(--pastel-blue-dark); color:white; width:100%; justify-content:center;">
-            💾 Guardar en Dispositivo (Alta Resolución)
+            💾 Guardar en Galería (1080p)
           </button>
         </div>
         <div class="pages-grid" id="bookPagesGrid"></div>
@@ -449,14 +450,14 @@
   </div>
 
   <script>
-    // RESOLUCIÓN HD REAL (1080 x 1620 px)
-    const HD_WIDTH = 1080;
-    const HD_HEIGHT = 1620;
+    // RESOLUCIÓN INTERNA HD REAL (1080 x 1620 px)
+    var HD_WIDTH = 1080;
+    var HD_HEIGHT = 1620;
 
-    const state = {
+    var state = {
       tool: 'pen',
       color: '#2D3748',
-      size: 10,
+      size: 8,
       layers: [],
       currentLayerIdx: 0,
       undoStack: [],
@@ -464,28 +465,28 @@
       isDrawing: false,
       lastX: 0,
       lastY: 0,
-      points: [],
       pan: { x: 0, y: 0 },
       isPanning: false,
       panStart: { x: 0, y: 0 }
     };
 
-    const canvasWrapper = document.getElementById('canvas-wrapper');
-    const pressureIndicator = document.getElementById('pressureIndicator');
+    var canvasWrapper = document.getElementById('canvas-wrapper');
+    var pressureIndicator = document.getElementById('pressureIndicator');
 
     function addLayer() {
-      const canvas = document.createElement('canvas');
+      var canvas = document.createElement('canvas');
       canvas.width = HD_WIDTH;
       canvas.height = HD_HEIGHT;
       canvas.className = 'drawing-layer';
-      const ctx = canvas.getContext('2d', { alpha: true });
+      var ctx = canvas.getContext('2d');
       
+      // Fondo blanco en la capa 1
       if(state.layers.length === 0) {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, HD_WIDTH, HD_HEIGHT);
       }
 
-      const layerObj = { canvas, ctx, name: `Capa ${state.layers.length + 1}` };
+      var layerObj = { canvas: canvas, ctx: ctx, name: 'Capa ' + (state.layers.length + 1) };
       state.layers.push(layerObj);
       canvasWrapper.appendChild(canvas);
       setActiveLayer(state.layers.length - 1);
@@ -498,36 +499,43 @@
     }
 
     function renderLayersList() {
-      const list = document.getElementById('layersList');
+      var list = document.getElementById('layersList');
       if (!list) return;
       list.innerHTML = '';
-      state.layers.forEach((layer, idx) => {
-        const item = document.createElement('div');
-        item.className = `layer-item ${idx === state.currentLayerIdx ? 'active' : ''}`;
-        item.innerHTML = `<span>${layer.name}</span>`;
-        item.onclick = () => setActiveLayer(idx);
+      state.layers.forEach(function(layer, idx) {
+        var item = document.createElement('div');
+        item.className = 'layer-item' + (idx === state.currentLayerIdx ? ' active' : '');
+        item.innerHTML = '<span>' + layer.name + '</span>';
+        item.onclick = function() { setActiveLayer(idx); };
         list.appendChild(item);
       });
     }
 
     function currentCtx() {
-      return state.layers[state.currentLayerIdx]?.ctx;
+      if (state.layers[state.currentLayerIdx]) {
+        return state.layers[state.currentLayerIdx].ctx;
+      }
+      return null;
     }
 
+    // Conversión de coordenadas de pantalla al lienzo HD
     function getHDCoords(e) {
-      const rect = canvasWrapper.getBoundingClientRect();
-      const scaleX = HD_WIDTH / rect.width;
-      const scaleY = HD_HEIGHT / rect.height;
+      var rect = canvasWrapper.getBoundingClientRect();
+      var clientX = e.clientX;
+      var clientY = e.clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      }
       return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY
+        x: (clientX - rect.left) * (HD_WIDTH / rect.width),
+        y: (clientY - rect.top) * (HD_HEIGHT / rect.height)
       };
     }
 
-    // MOTOR DE TRAZO FLUIDO
-    canvasWrapper.addEventListener('pointerdown', (e) => {
+    // --- MOTOR DE DIBUJO DIRECTO ULTRA RÁPIDO ---
+    function onPointerDown(e) {
       e.preventDefault();
-      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
 
       if (state.tool === 'pan') {
         state.isPanning = true;
@@ -536,90 +544,81 @@
       }
 
       state.isDrawing = true;
-      const pt = getHDCoords(e);
-      state.points = [pt];
-      state.lastX = pt.x;
-      state.lastY = pt.y;
+      var coords = getHDCoords(e);
+      state.lastX = coords.x;
+      state.lastY = coords.y;
 
-      let pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
-      pressureIndicator.innerText = `${Math.round(pressure * 100)}%`;
+      var pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
+      pressureIndicator.innerText = 'Stylus: ' + Math.round(pressure * 100) + '%';
 
-      const ctx = currentCtx();
+      var ctx = currentCtx();
       if (!ctx) return;
-      const strokeWidth = state.size * 3 * pressure;
 
-      applyToolStyle(ctx, strokeWidth);
+      var strokeWidth = Math.max(2, state.size * 3 * pressure);
+      setupContext(ctx, strokeWidth);
+
+      // Dibuja punto inicial al tocar
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, strokeWidth / 2, 0, Math.PI * 2);
+      ctx.arc(coords.x, coords.y, strokeWidth / 2, 0, Math.PI * 2);
       ctx.fill();
-    });
+    }
 
-    window.addEventListener('pointermove', (e) => {
+    function onPointerMove(e) {
       if (state.isPanning) {
         state.pan.x = e.clientX - state.panStart.x;
         state.pan.y = e.clientY - state.panStart.y;
-        canvasWrapper.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px)`;
+        canvasWrapper.style.transform = 'translate(' + state.pan.x + 'px, ' + state.pan.y + 'px)';
         return;
       }
+
       if (!state.isDrawing) return;
       e.preventDefault();
 
-      const pt = getHDCoords(e);
-      state.points.push(pt);
-
-      const ctx = currentCtx();
+      var coords = getHDCoords(e);
+      var ctx = currentCtx();
       if (!ctx) return;
 
-      let pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
-      const strokeWidth = Math.max(1, state.size * 3 * pressure);
+      var pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
+      var strokeWidth = Math.max(2, state.size * 3 * pressure);
+      setupContext(ctx, strokeWidth);
 
-      applyToolStyle(ctx, strokeWidth);
-
-      if (state.points.length > 2) {
-        const p1 = state.points[state.points.length - 2];
-        const p2 = state.points[state.points.length - 1];
-        const midPoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-
-        if (state.tool === 'crayon') {
-          ctx.fillStyle = state.color;
-          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
-          for (let i = 0; i < dist; i += 4) {
-            const t = i / dist;
-            const rx = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * strokeWidth;
-            const ry = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * strokeWidth;
-            ctx.globalAlpha = 0.35;
-            ctx.fillRect(rx, ry, 3.5, 3.5);
-          }
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(state.lastX, state.lastY);
-          ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
-          ctx.stroke();
+      if (state.tool === 'crayon') {
+        // Textura suave de crayón
+        ctx.fillStyle = state.color;
+        var dist = Math.hypot(coords.x - state.lastX, coords.y - state.lastY) || 1;
+        for (var i = 0; i < dist; i += 4) {
+          var t = i / dist;
+          var rx = state.lastX + (coords.x - state.lastX) * t + (Math.random() - 0.5) * strokeWidth;
+          var ry = state.lastY + (coords.y - state.lastY) * t + (Math.random() - 0.5) * strokeWidth;
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(rx, ry, 3.5, 3.5);
         }
-
-        state.lastX = midPoint.x;
-        state.lastY = midPoint.y;
+      } else {
+        // Trazo directo continuo HD sin cortes
+        ctx.beginPath();
+        ctx.moveTo(state.lastX, state.lastY);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
       }
-    });
 
-    const stopDrawing = (e) => {
+      state.lastX = coords.x;
+      state.lastY = coords.y;
+    }
+
+    function onPointerUp(e) {
       if (state.isDrawing) {
         state.isDrawing = false;
         saveState();
       }
       state.isPanning = false;
-      try { if (e?.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
-    };
+    }
 
-    window.addEventListener('pointerup', stopDrawing);
-    window.addEventListener('pointercancel', stopDrawing);
-
-    function applyToolStyle(ctx, width) {
+    function setupContext(ctx, width) {
       ctx.lineWidth = width;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      if (state.tool === 'pen') {
+      if (state.tool === 'pen' || state.tool === 'crayon') {
         ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.color;
@@ -634,16 +633,22 @@
         ctx.globalCompositeOperation = state.currentLayerIdx === 0 ? 'source-over' : 'destination-out';
         ctx.strokeStyle = '#FFFFFF';
         ctx.fillStyle = '#FFFFFF';
-        ctx.lineWidth = width * 1.6;
+        ctx.lineWidth = width * 1.8;
       }
     }
 
-    // HISTORIAL SEGURO
+    // REGISTRO DIRECTO DE EVENTOS UNIVERSALES
+    canvasWrapper.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    // HISTORIAL DESHACER / REHACER
     function saveState() {
       try {
-        const c = state.layers[state.currentLayerIdx]?.canvas;
-        if (c) {
-          state.undoStack.push(c.toDataURL());
+        var current = state.layers[state.currentLayerIdx];
+        if (current && current.canvas) {
+          state.undoStack.push(current.canvas.toDataURL());
           if (state.undoStack.length > 20) state.undoStack.shift();
           state.redoStack = [];
         }
@@ -653,10 +658,11 @@
     function undo() {
       if (state.undoStack.length > 1) {
         state.redoStack.push(state.undoStack.pop());
-        const img = new Image();
+        var img = new Image();
         img.src = state.undoStack[state.undoStack.length - 1];
-        img.onload = () => {
-          const ctx = currentCtx();
+        img.onload = function() {
+          var ctx = currentCtx();
+          if (!ctx) return;
           ctx.clearRect(0, 0, HD_WIDTH, HD_HEIGHT);
           ctx.drawImage(img, 0, 0);
         };
@@ -665,12 +671,13 @@
 
     function redo() {
       if (state.redoStack.length > 0) {
-        const src = state.redoStack.pop();
+        var src = state.redoStack.pop();
         state.undoStack.push(src);
-        const img = new Image();
+        var img = new Image();
         img.src = src;
-        img.onload = () => {
-          const ctx = currentCtx();
+        img.onload = function() {
+          var ctx = currentCtx();
+          if (!ctx) return;
           ctx.clearRect(0, 0, HD_WIDTH, HD_HEIGHT);
           ctx.drawImage(img, 0, 0);
         };
@@ -680,100 +687,32 @@
     document.getElementById('undoBtn').onclick = undo;
     document.getElementById('redoBtn').onclick = redo;
 
-    // HERRAMIENTAS
-    document.querySelectorAll('.tool-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    // BOTONES DE HERRAMIENTAS
+    document.querySelectorAll('.tool-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
         state.tool = btn.dataset.tool;
       });
     });
 
-    document.getElementById('colorPicker').oninput = (e) => state.color = e.target.value;
-    document.getElementById('brushSize').oninput = (e) => state.size = e.target.value;
+    document.getElementById('colorPicker').oninput = function(e) { state.color = e.target.value; };
+    document.getElementById('brushSize').oninput = function(e) { state.size = e.target.value; };
 
-    // REFERENCIA
-    const refPanel = document.getElementById('refPanel');
-    const refDragHandle = document.getElementById('refDragHandle');
-    document.getElementById('toggleRefBtn').onclick = () => refPanel.classList.toggle('hidden');
-    document.getElementById('closeRefBtn').onclick = () => refPanel.classList.add('hidden');
-    document.getElementById('refPlaceholder').onclick = () => document.getElementById('refInput').click();
+    // PANEL DE REFERENCIA
+    var refPanel = document.getElementById('refPanel');
+    var refDragHandle = document.getElementById('refDragHandle');
+    document.getElementById('toggleRefBtn').onclick = function() { refPanel.classList.toggle('hidden'); };
+    document.getElementById('closeRefBtn').onclick = function() { refPanel.classList.add('hidden'); };
+    document.getElementById('refPlaceholder').onclick = function() { document.getElementById('refInput').click(); };
 
-    document.getElementById('refInput').onchange = (e) => {
-      const file = e.target.files[0];
+    document.getElementById('refInput').onchange = function(e) {
+      var file = e.target.files[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const img = document.getElementById('refImg');
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          var img = document.getElementById('refImg');
           img.src = evt.target.result;
           img.style.display = 'block';
           document.getElementById('refPlaceholder').style.display = 'none';
         };
-        reader.readAsDataURL(file);
-      }
-    };
-
-    let isDrag = false, offset = { x: 0, y: 0 };
-    refDragHandle.addEventListener('pointerdown', (e) => {
-      isDrag = true;
-      offset = { x: e.clientX - refPanel.offsetLeft, y: e.clientY - refPanel.offsetTop };
-    });
-    window.addEventListener('pointermove', (e) => {
-      if (!isDrag) return;
-      refPanel.style.left = `${e.clientX - offset.x}px`;
-      refPanel.style.top = `${e.clientY - offset.y}px`;
-    });
-    window.addEventListener('pointerup', () => isDrag = false);
-
-    // CAPAS
-    document.getElementById('layersBtn').onclick = () => document.getElementById('layersPanel').classList.toggle('open');
-    document.getElementById('addLayerBtn').onclick = addLayer;
-
-    // GUARDADO HD
-    const bookModal = document.getElementById('bookModal');
-    document.getElementById('openBookBtn').onclick = () => {
-      renderBook();
-      bookModal.classList.add('open');
-    };
-    document.getElementById('closeBookModalBtn').onclick = () => bookModal.classList.remove('open');
-
-    document.getElementById('savePageBtn').onclick = () => {
-      const exp = document.createElement('canvas');
-      exp.width = HD_WIDTH;
-      exp.height = HD_HEIGHT;
-      const ctx = exp.getContext('2d');
-      
-      state.layers.forEach(l => ctx.drawImage(l.canvas, 0, 0));
-      const fullQualityUrl = exp.toDataURL('image/png', 1.0);
-
-      try {
-        let pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
-        pages.unshift({ id: Date.now(), img: fullQualityUrl, date: new Date().toLocaleDateString() });
-        localStorage.setItem('drafty_hd_pages', JSON.stringify(pages.slice(0, 10)));
-      } catch(e) {}
-
-      const a = document.createElement('a');
-      a.download = `Drafty_HD_${Date.now()}.png`;
-      a.href = fullQualityUrl;
-      a.click();
-
-      renderBook();
-      alert('¡Hoja guardada en alta resolución (1080p) en tu galería!');
-    };
-
-    function renderBook() {
-      const grid = document.getElementById('bookPagesGrid');
-      let pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
-      grid.innerHTML = pages.length ? '' : '<p style="grid-column: span 2; font-size:11px; color:#94A3B8;">El cuaderno está vacío.</p>';
-      pages.forEach(p => {
-        const d = document.createElement('div');
-        d.className = 'page-card';
-        d.innerHTML = `<img src="${p.img}" /><span style="font-size:10px; color:#64748B;">${p.date}</span>`;
-        grid.appendChild(d);
-      });
-    }
-
-    addLayer();
-  </script>
-</body>
-</html>
