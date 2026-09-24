@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Drafty</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gray: #F0F2F5;
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --pastel-blue-light: #EBF2FF;
+      --pastel-blue: #A2C2FB;
+      --pastel-blue-dark: #6C9CE8;
+      --accent-shadow: rgba(162, 194, 251, 0.35);
+      --text-main: #4A5568;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-gray);
+      font-family: 'Fredoka', cursive, sans-serif;
+      color: var(--text-main);
+    }
+
+    #canvas-viewport {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: var(--bg-gray);
+      background-image: radial-gradient(#DEE4EC 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+      overflow: hidden;
+    }
+
+    /* Tamaño visual en pantalla: fluido y nítido */
+    #canvas-wrapper {
+      position: relative;
+      width: 360px;
+      height: 540px;
+      max-width: 92vw;
+      max-height: 72vh;
+      background: #FFFFFF;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      border-radius: 16px;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .drawing-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      touch-action: none;
+    }
+
+    /* BARRA SUPERIOR */
+    .top-bar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      min-height: 52px;
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border-radius: 26px;
+      box-shadow: 0 8px 20px var(--accent-shadow);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      z-index: 50;
+      border: 2px solid white;
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title {
+      font-size: 21px;
+      font-weight: 700;
+      color: var(--pastel-blue-dark);
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill-btn {
+      background: white;
+      border: 1.5px solid var(--pastel-blue-light);
+      border-radius: 18px;
+      padding: 6px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      transition: transform 0.15s ease;
+    }
+
+    .pill-btn:active {
+      transform: scale(0.92);
+      background: var(--pastel-blue-light);
+    }
+
+    /* CONTROLES FLOTANTES */
+    .tool-settings {
+      position: absolute;
+      bottom: 82px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      padding: 6px 16px;
+      border-radius: 26px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      z-index: 45;
+      border: 2px solid white;
+    }
+
+    .color-picker-bubble {
+      -webkit-appearance: none;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      background: transparent;
+    }
+    .color-picker-bubble::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-picker-bubble::-webkit-color-swatch {
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .brush-slider {
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 4px;
+      background: #E2E8F0;
+      outline: none;
+      width: 85px;
+    }
+    .brush-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--pastel-blue-dark);
+      cursor: pointer;
+      border: 2px solid white;
+    }
+
+    .bottom-dock {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      padding: 6px 12px;
+      border-radius: 35px;
+      box-shadow: 0 10px 25px var(--accent-shadow);
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      z-index: 50;
+      border: 2px solid white;
+    }
+
+    .tool-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      font-size: 18px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .tool-btn.active {
+      background: var(--pastel-blue);
+      transform: translateY(-3px) scale(1.08);
+      box-shadow: 0 4px 10px var(--accent-shadow);
+    }
+
+    /* PESTAÑA REFERENCIA */
+    .reference-panel {
+      position: absolute;
+      top: 75px;
+      left: 15px;
+      width: 160px;
+      height: 200px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+      border: 3px solid var(--pastel-blue-light);
+      display: flex;
+      flex-direction: column;
+      z-index: 60;
+      overflow: hidden;
+    }
+    .reference-panel.hidden { display: none; }
+
+    .reference-header {
+      background: var(--pastel-blue-light);
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      color: var(--pastel-blue-dark);
+      cursor: move;
+    }
+
+    .reference-img-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FAFAFA;
+    }
+    .reference-img-container img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    /* PANEL CAPAS */
+    .layers-panel {
+      position: absolute;
+      right: 15px;
+      top: 75px;
+      width: 170px;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border-radius: 18px;
+      padding: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      z-index: 55;
+      border: 2px solid white;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .layers-panel.open { display: flex; }
+
+    .layer-item {
+      padding: 6px 10px;
+      background: white;
+      border-radius: 10px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .layer-item.active {
+      border-color: var(--pastel-blue-dark);
+      background: var(--pastel-blue-light);
+    }
+
+    /* MODAL LIBRO */
+    .book-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(43, 52, 69, 0.45);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .book-modal.open { display: flex; }
+
+    .book-container {
+      width: 86vw;
+      max-width: 440px;
+      height: 68vh;
+      background: #FFFFFF;
+      border-radius: 22px;
+      border: 6px solid #D6E4F0;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .book-spine {
+      width: 18px;
+      background: linear-gradient(to right, #A2C2FB, #8FB5F7);
+    }
+
+    .book-content {
+      padding: 14px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .pages-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .page-card {
+      background: white;
+      border-radius: 8px;
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      border: 1px solid #E8EEF5;
+      text-align: center;
+    }
+    .page-card img {
+      width: 100%;
+      height: 90px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-viewport">
+    <div id="canvas-wrapper"></div>
+  </div>
+
+  <header class="top-bar">
+    <div class="brand">
+      <span style="font-size: 22px;">🎨</span>
+      <span class="brand-title">Drafty</span>
+      <span id="pressureIndicator" style="font-size: 11px; background: #EBF2FF; color: #4A5568; padding: 2px 8px; border-radius: 12px;">100%</span>
+    </div>
+
+    <div class="top-actions">
+      <button class="pill-btn" id="undoBtn" type="button">↩ <b>Z</b></button>
+      <button class="pill-btn" id="redoBtn" type="button">↪ <b>Y</b></button>
+      <button class="pill-btn" id="toggleRefBtn" type="button">🖼 Ref</button>
+      <button class="pill-btn" id="layersBtn" type="button">📑 Capas</button>
+      <button class="pill-btn" id="openBookBtn" type="button" style="background: var(--pastel-blue-light); color: var(--pastel-blue-dark);">📖 Libro</button>
+    </div>
+  </header>
+
+  <div class="reference-panel hidden" id="refPanel">
+    <div class="reference-header" id="refDragHandle">
+      <span>Referencia</span>
+      <span style="cursor:pointer;" id="closeRefBtn">✕</span>
+    </div>
+    <div class="reference-img-container">
+      <img id="refImg" src="" style="display:none;" />
+      <label for="refInput" id="refPlaceholder" style="font-size: 11px; text-align: center; color: #94A3B8; cursor: pointer; padding: 8px;">
+        Toca para cargar foto
+      </label>
+      <input type="file" id="refInput" accept="image/*" style="display:none;" />
+    </div>
+  </div>
+
+  <div class="layers-panel" id="layersPanel">
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700;">
+      <span>Capas</span>
+      <button class="pill-btn" id="addLayerBtn" type="button" style="padding: 2px 6px;">+ Nueva</button>
+    </div>
+    <div id="layersList" style="display:flex; flex-direction:column; gap:4px;"></div>
+  </div>
+
+  <div class="tool-settings">
+    <input type="color" id="colorPicker" class="color-picker-bubble" value="#2D3748">
+    <input type="range" id="brushSize" class="brush-slider" min="2" max="60" value="10">
+  </div>
+
+  <nav class="bottom-dock">
+    <button class="tool-btn active" data-tool="pen" type="button" title="Pluma">✒️</button>
+    <button class="tool-btn" data-tool="marker" type="button" title="Marcador">🖊️</button>
+    <button class="tool-btn" data-tool="crayon" type="button" title="Crayón">🖍️</button>
+    <button class="tool-btn" data-tool="eraser" type="button" title="Borrador">🧹</button>
+    <button class="tool-btn" data-tool="pan" type="button" title="Mover Lienzo">✋</button>
+  </nav>
+
+  <div class="book-modal" id="bookModal">
+    <div class="book-container">
+      <div class="book-spine"></div>
+      <div class="book-content">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0; color:var(--pastel-blue-dark);">Mi Cuaderno HD</h3>
+          <button class="pill-btn" id="closeBookModalBtn" type="button">Cerrar</button>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="pill-btn" id="savePageBtn" type="button" style="background: var(--pastel-blue-dark); color:white; width:100%; justify-content:center;">
+            💾 Guardar en Dispositivo (Alta Resolución)
+          </button>
+        </div>
+        <div class="pages-grid" id="bookPagesGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // RESOLUCIÓN HD REAL (1080 x 1620 px para impresión y nitidez total)
+    const HD_WIDTH = 1080;
+    const HD_HEIGHT = 1620;
+
+    const state = {
+      tool: 'pen',
+      color: '#2D3748',
+      size: 10,
+      layers: [],
+      currentLayerIdx: 0,
+      undoStack: [],
+      redoStack: [],
+      isDrawing: false,
+      lastX: 0,
+      lastY: 0,
+      points: [],
+      pan: { x: 0, y: 0 },
+      isPanning: false,
+      panStart: { x: 0, y: 0 }
+    };
+
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+    const pressureIndicator = document.getElementById('pressureIndicator');
+
+    function addLayer() {
+      const canvas = document.createElement('canvas');
+      canvas.width = HD_WIDTH;
+      canvas.height = HD_HEIGHT;
+      canvas.className = 'drawing-layer';
+      const ctx = canvas.getContext('2d', { alpha: true });
+      
+      // Fondo blanco solo para la primera capa
+      if(state.layers.length === 0) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, HD_WIDTH, HD_HEIGHT);
+      }
+
+      const layerObj = { canvas, ctx, name: `Capa ${state.layers.length + 1}` };
+      state.layers.push(layerObj);
+      canvasWrapper.appendChild(canvas);
+      setActiveLayer(state.layers.length - 1);
+      renderLayersList();
+    }
+
+    function setActiveLayer(idx) {
+      state.currentLayerIdx = idx;
+      renderLayersList();
+    }
+
+    function renderLayersList() {
+      const list = document.getElementById('layersList');
+      if (!list) return;
+      list.innerHTML = '';
+      state.layers.forEach((layer, idx) => {
+        const item = document.createElement('div');
+        item.className = `layer-item ${idx === state.currentLayerIdx ? 'active' : ''}`;
+        item.innerHTML = `<span>${layer.name}</span>`;
+        item.onclick = () => setActiveLayer(idx);
+        list.appendChild(item);
+      });
+    }
+
+    function currentCtx() {
+      return state.layers[state.currentLayerIdx]?.ctx;
+    }
+
+    // Conversión de coordenadas de pantalla a HD real
+    function getHDCoords(e) {
+      const rect = canvasWrapper.getBoundingClientRect();
+      const scaleX = HD_WIDTH / rect.width;
+      const scaleY = HD_HEIGHT / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    // --- MOTOR DE TRAZO SUAVE Y OPTIMIZADO (SIN LAG) ---
+    canvasWrapper.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
+
+      if (state.tool === 'pan') {
+        state.isPanning = true;
+        state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+        return;
+      }
+
+      state.isDrawing = true;
+      const pt = getHDCoords(e);
+      state.points = [pt];
+      state.lastX = pt.x;
+      state.lastY = pt.y;
+
+      let pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
+      pressureIndicator.innerText = `${Math.round(pressure * 100)}%`;
+
+      // Trazar punto inicial al tocar
+      const ctx = currentCtx();
+      if (!ctx) return;
+      const strokeWidth = state.size * 3 * pressure;
+
+      applyToolStyle(ctx, strokeWidth);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, strokeWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (state.isPanning) {
+        state.pan.x = e.clientX - state.panStart.x;
+        state.pan.y = e.clientY - state.panStart.y;
+        canvasWrapper.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px)`;
+        return;
+      }
+      if (!state.isDrawing) return;
+      e.preventDefault();
+
+      const pt = getHDCoords(e);
+      state.points.push(pt);
+
+      const ctx = currentCtx();
+      if (!ctx) return;
+
+      let pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
+      const strokeWidth = Math.max(1, state.size * 3 * pressure);
+
+      applyToolStyle(ctx, strokeWidth);
+
+      // Suavizado dinámico por curva Bézier (evita esquinas y aceleración rápida)
+      if (state.points.length > 2) {
+        const p1 = state.points[state.points.length - 2];
+        const p2 = state.points[state.points.length - 1];
+        const midPoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+        if (state.tool === 'crayon') {
+          // Textura de crayón rápida
+          ctx.fillStyle = state.color;
+          const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+          for (let i = 0; i < dist; i += 4) {
+            const t = i / dist;
+            const rx = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * strokeWidth;
+            const ry = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * strokeWidth;
+            ctx.globalAlpha = 0.35;
+            ctx.fillRect(rx, ry, 3.5, 3.5);
+          }
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(state.lastX, state.lastY);
+          ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
+          ctx.stroke();
+        }
+
+        state.lastX = midPoint.x;
+        state.lastY = midPoint.y;
+      }
+    });
+
+    const stopDrawing = (e) => {
+      if (state.isDrawing) {
+        state.isDrawing = false;
+        saveState();
+      }
+      state.isPanning = false;
+      try { if (e?.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
+    };
+
+    window.addEventListener('pointerup', stopDrawing);
+    window.addEventListener('pointercancel', stopDrawing);
+
+    function applyToolStyle(ctx, width) {
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (state.tool === 'pen') {
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = state.color;
+        ctx.fillStyle = state.color;
+      } else if (state.tool === 'marker') {
+        ctx.globalAlpha = 0.45;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = state.color;
+        ctx.fillStyle = state.color;
+      } else if (state.tool === 'eraser') {
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = state.currentLayerIdx === 0 ? 'source-over' : 'destination-out';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.lineWidth = width * 1.6;
+      }
+    }
+
+    // HISTORIAL DESHACER / REHACER
+    function saveState() {
+      try {
+        const c = state.layers[state.currentLayerIdx]?.canvas;
+        if (c) {
+          state.undoStack.push(c.toDataURL());
+          if (state.undoStack.length > 20) state.undoStack.shift();
+          state.redoStack = [];
+        }
+      } catch(e) {}
+    }
+
+    function undo() {
+      if (state.undoStack.length > 1) {
+        state.redoStack.push(state.undoStack.pop());
+        const img = new Image();
+        img.src = state.undoStack[state.undoStack.length - 1];
+        img.onload = () => {
+          const ctx = currentCtx();
+          ctx.clearRect(0, 0, HD_WIDTH, HD_HEIGHT);
+          ctx.drawImage(img, 0, 0);
+        };
+      }
+    }
+
+    function redo() {
+      if (state.redoStack.length > 0) {
+        const src = state.redoStack.pop();
+        state.undoStack.push(src);
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          const ctx = currentCtx();
+          ctx.clearRect(0, 0, HD_WIDTH, HD_HEIGHT);
+          ctx.drawImage(img, 0, 0);
+        };
+      }
+    }
+
+    document.getElementById('undoBtn').onclick = undo;
+    document.getElementById('redoBtn').onclick = redo;
+
+    // HERRAMIENTAS
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.tool = btn.dataset.tool;
+      });
+    });
+
+    document.getElementById('colorPicker').oninput = (e) => state.color = e.target.value;
+    document.getElementById('brushSize').oninput = (e) => state.size = e.target.value;
+
+    // FOTO REFERENCIA
+    const refPanel = document.getElementById('refPanel');
+    const refDragHandle = document.getElementById('refDragHandle');
+    document.getElementById('toggleRefBtn').onclick = () => refPanel.classList.toggle('hidden');
+    document.getElementById('closeRefBtn').onclick = () => refPanel.classList.add('hidden');
+    document.getElementById('refPlaceholder').onclick = () => document.getElementById('refInput').click();
+
+    document.getElementById('refInput').onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const img = document.getElementById('refImg');
+          img.src = evt.target.result;
+          img.style.display = 'block';
+          document.getElementById('refPlaceholder').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    let isDrag = false, offset = { x: 0, y: 0 };
+    refDragHandle.addEventListener('pointerdown', (e) => {
+      isDrag = true;
+      offset = { x: e.clientX - refPanel.offsetLeft, y: e.clientY - refPanel.offsetTop };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!isDrag) return;
+      refPanel.style.left = `${e.clientX - offset.x}px`;
+      refPanel.style.top = `${e.clientY - offset.y}px`;
+    });
+    window.addEventListener('pointerup', () => isDrag = false);
+
+    // CAPAS
+    document.getElementById('layersBtn').onclick = () => document.getElementById('layersPanel').classList.toggle('open');
+    document.getElementById('addLayerBtn').onclick = addLayer;
+
+    // GUARDADO HD EN DISPOSITIVO Y CUADERNO
+    const bookModal = document.getElementById('bookModal');
+    document.getElementById('openBookBtn').onclick = () => {
+      renderBook();
+      bookModal.classList.add('open');
+    };
+    document.getElementById('closeBookModalBtn').onclick = () => bookModal.classList.remove('open');
+
+    document.getElementById('savePageBtn').onclick = () => {
+      const exp = document.createElement('canvas');
+      exp.width = HD_WIDTH;
+      exp.height = HD_HEIGHT;
+      const ctx = exp.getContext('2d');
+      
+      // Combinar todas las capas en máxima calidad
+      state.layers.forEach(l => ctx.drawImage(l.canvas, 0, 0));
+      
+      const fullQualityUrl = exp.toDataURL('image/png', 1.0);
+
+      // Guardar en almacenamiento local para el libro
+      try {
+        let pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
+        pages.unshift({ id: Date.now(), img: fullQualityUrl, date: new Date().toLocaleDateString() });
+        localStorage.setItem('drafty_hd_pages', JSON.stringify(pages.slice(0, 10)));
+      } catch(e) {}
+
+      // Descargar directamente en el celular en 1080p
+      const a = document.createElement('a');
+      a.download = `Drafty_HD_${Date.now()}.png`;
+      a.href = fullQualityUrl;
+      a.click();
+
+      renderBook();
+      alert('¡Hoja guardada en alta resolución (1080p) en tu galería!');
+    };
+
+    function renderBook() {
+      const grid = document.getElementById('bookPagesGrid');
+      let pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
+      grid.innerHTML = pages.length ? '' : '<p style="grid-column: span 2; font-size:11px; color:#94A3B8;">El cuaderno está vacío.</p>';
+      pages.forEach(p => {
+        const d = document.createElement('div');
+        d.className = 'page-card';
+        d.innerHTML = `<img src="${p.img}" /><span style="font-size:10px; color:#64748B;">${p.date}</span>`;
+        grid.appendChild(d);
+      });
+    }
+
+    // Iniciar con la primera capa HD
+    addLayer();
+  </script>
+</body>
+</html>
