@@ -638,10 +638,43 @@
     }
 
     // REGISTRO DIRECTO DE EVENTOS UNIVERSALES
-    canvasWrapper.addEventListener('pointerdown', onPointerDown);
+    // REGISTRO DIRECTO CON PROTECCIÓN TÁCTIL PARA CELULAR
+    canvasWrapper.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
+      onPointerDown(e);
+    });
     window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('pointerup', function(e) {
+      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
+      onPointerUp(e);
+    });
+    window.addEventListener('pointercancel', function(e) {
+      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
+      onPointerUp(e);
+    });
+
+    // Bloqueo de gestos del sistema en pantalla táctil
+    canvasWrapper.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
+    canvasWrapper.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });// REGISTRO DIRECTO CON PROTECCIÓN TÁCTIL PARA CELULAR
+    canvasWrapper.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
+      onPointerDown(e);
+    });
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', function(e) {
+      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
+      onPointerUp(e);
+    });
+    window.addEventListener('pointercancel', function(e) {
+      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
+      onPointerUp(e);
+    });
+
+    // Bloqueo de gestos del sistema en pantalla táctil
+    canvasWrapper.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
+    canvasWrapper.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
     // HISTORIAL DESHACER / REHACER
     function saveState() {
