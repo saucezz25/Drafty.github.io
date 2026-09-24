@@ -770,19 +770,7 @@
         d.className = 'page-card';
         d.innerHTML = `<img src="${p.img}" /><span style="font-size:10px; color:#64748B;">${p.date}</span>`;
         grid.appendChild(d);
-      });<!-- Conexión del Manifiesto y tema -->
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#A2C2FB" />
-  <meta name="mobile-web-app-capable" content="yes" />
-
-  <!-- Registro del Service Worker para PWABuilder -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js');
       });
-    }
-  </script>
     }
 
     addLayer();
