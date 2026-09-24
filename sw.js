@@ -19,5 +19,24 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((res) => res || fetch(e.request))
+    <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').then(function(reg) {
+          // Obliga a buscar si hay versión nueva cada vez que abre
+          reg.update();
+        }).catch(function(e){});
+      });
+    }
+
+    // Vacía memorias caché antiguas que hayan quedado huérfanas
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        names.forEach(function(name) {
+          if (name !== 'drafty-v6') caches.delete(name);
+        });
+      });
+    }
+  </script>
   );
 });
