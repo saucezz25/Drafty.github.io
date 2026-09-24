@@ -1009,9 +1009,15 @@
       alert('¡Hoja guardada en alta resolución (1080p) en tu galería!');
     };
 
-    
-    }
-  </script>
+    function renderBook() {
+      var grid = document.getElementById('bookPagesGrid');
+      var pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
+      grid.innerHTML = pages.length ? '' : '<p style="grid-column: span 2; font-size:11px; color:#94A3B8;">El cuaderno está vacío.</p>';
+      pages.forEach(function(p) {
+        var d = document.createElement('div');
+        d.className = 'page-card';
+        d.innerHTML = '<img src="' + p.img + '" /><span style="font-size:10px; color:#64748B;">' + p.date + '</span>';
+        grid.appendChild(d);
       });
     }
 
