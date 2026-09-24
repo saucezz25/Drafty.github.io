@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Drafty</title>
 
-  <!-- VINCULACIÓN PARA PWABUILDER / APK -->
+  <!-- VINCULACIÓN PWABUILDER -->
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#A2C2FB" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -15,12 +15,11 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js').catch(function(e){ console.log(e); });
+        navigator.serviceWorker.register('./sw.js').catch(function(e){});
       });
     }
   </script>
 
-  <!-- Tipografía -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
@@ -40,7 +39,7 @@
       box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: none;
+      -webkit-touch-callout: none;
     }
 
     body {
@@ -76,7 +75,7 @@
       box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
       border-radius: 16px;
       cursor: crosshair;
-      touch-action: none;
+      touch-action: none !important; /* Bloquea gestos sin matar la tinta */
     }
 
     .drawing-layer {
@@ -86,7 +85,7 @@
       width: 100%;
       height: 100%;
       border-radius: 16px;
-      pointer-events: none; /* Los toques van directo al lienzo */
+      pointer-events: none;
     }
 
     /* BARRA SUPERIOR */
@@ -142,7 +141,6 @@
       gap: 4px;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-      transition: transform 0.15s ease;
     }
 
     .pill-btn:active {
@@ -230,7 +228,6 @@
       justify-content: center;
       align-items: center;
       cursor: pointer;
-      transition: all 0.18s ease;
     }
 
     .tool-btn.active {
@@ -383,7 +380,7 @@
     <div class="brand">
       <span style="font-size: 22px;">🎨</span>
       <span class="brand-title">Drafty</span>
-      <span id="versionBadge" style="font-size: 11px; background: #D1FAE5; color: #065F46; padding: 2px 7px; border-radius: 12px; font-weight: 600;">v3 HD 🟢</span>
+      <span id="versionBadge" style="font-size: 11px; background: #D1FAE5; color: #065F46; padding: 2px 7px; border-radius: 12px; font-weight: 600;">v4 Móvil 🟢</span>
     </div>
 
     <div class="top-actions">
@@ -419,7 +416,7 @@
 
   <div class="tool-settings">
     <input type="color" id="colorPicker" class="color-picker-bubble" value="#2D3748">
-    <input type="range" id="brushSize" class="brush-slider" min="2" max="50" value="8">
+    <input type="range" id="brushSize" class="brush-slider" min="2" max="50" value="10">
     <span id="pressureIndicator" style="font-size: 11px; color: #64748B;">Stylus: 100%</span>
   </div>
 
@@ -450,14 +447,13 @@
   </div>
 
   <script>
-    // RESOLUCIÓN INTERNA HD REAL (1080 x 1620 px)
     var HD_WIDTH = 1080;
     var HD_HEIGHT = 1620;
 
     var state = {
       tool: 'pen',
       color: '#2D3748',
-      size: 8,
+      size: 10,
       layers: [],
       currentLayerIdx: 0,
       undoStack: [],
@@ -480,7 +476,6 @@
       canvas.className = 'drawing-layer';
       var ctx = canvas.getContext('2d');
       
-      // Fondo blanco en la capa 1
       if(state.layers.length === 0) {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, HD_WIDTH, HD_HEIGHT);
@@ -518,94 +513,82 @@
       return null;
     }
 
-    // Conversión de coordenadas de pantalla al lienzo HD
-    function getHDCoords(e) {
+    // Calcula coordenadas HD exactas
+    function getCoords(clientX, clientY) {
       var rect = canvasWrapper.getBoundingClientRect();
-      var clientX = e.clientX;
-      var clientY = e.clientY;
-      if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      }
       return {
         x: (clientX - rect.left) * (HD_WIDTH / rect.width),
         y: (clientY - rect.top) * (HD_HEIGHT / rect.height)
       };
     }
 
-    // --- MOTOR DE DIBUJO DIRECTO ULTRA RÁPIDO ---
-    function onPointerDown(e) {
-      e.preventDefault();
-
+    // --- FUNCIONES CENTRALES DE DIBUJO ---
+    function startStroke(clientX, clientY, pressure) {
       if (state.tool === 'pan') {
         state.isPanning = true;
-        state.panStart = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+        state.panStart = { x: clientX - state.pan.x, y: clientY - state.pan.y };
         return;
       }
 
       state.isDrawing = true;
-      var coords = getHDCoords(e);
-      state.lastX = coords.x;
-      state.lastY = coords.y;
+      var pos = getCoords(clientX, clientY);
+      state.lastX = pos.x;
+      state.lastY = pos.y;
 
-      var pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
-      pressureIndicator.innerText = 'Stylus: ' + Math.round(pressure * 100) + '%';
+      var p = (pressure && pressure > 0) ? pressure : 0.8;
+      pressureIndicator.innerText = 'Stylus: ' + Math.round(p * 100) + '%';
 
       var ctx = currentCtx();
       if (!ctx) return;
 
-      var strokeWidth = Math.max(2, state.size * 3 * pressure);
+      var strokeWidth = Math.max(5, state.size * 3.5 * p);
       setupContext(ctx, strokeWidth);
 
-      // Dibuja punto inicial al tocar
       ctx.beginPath();
-      ctx.arc(coords.x, coords.y, strokeWidth / 2, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, strokeWidth / 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function onPointerMove(e) {
+    function moveStroke(clientX, clientY, pressure) {
       if (state.isPanning) {
-        state.pan.x = e.clientX - state.panStart.x;
-        state.pan.y = e.clientY - state.panStart.y;
+        state.pan.x = clientX - state.panStart.x;
+        state.pan.y = clientY - state.panStart.y;
         canvasWrapper.style.transform = 'translate(' + state.pan.x + 'px, ' + state.pan.y + 'px)';
         return;
       }
 
       if (!state.isDrawing) return;
-      e.preventDefault();
 
-      var coords = getHDCoords(e);
+      var pos = getCoords(clientX, clientY);
       var ctx = currentCtx();
       if (!ctx) return;
 
-      var pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.8;
-      var strokeWidth = Math.max(2, state.size * 3 * pressure);
+      var p = (pressure && pressure > 0) ? pressure : 0.8;
+      var strokeWidth = Math.max(5, state.size * 3.5 * p);
       setupContext(ctx, strokeWidth);
 
       if (state.tool === 'crayon') {
-        // Textura suave de crayón
         ctx.fillStyle = state.color;
-        var dist = Math.hypot(coords.x - state.lastX, coords.y - state.lastY) || 1;
+        var dist = Math.hypot(pos.x - state.lastX, pos.y - state.lastY) || 1;
         for (var i = 0; i < dist; i += 4) {
           var t = i / dist;
-          var rx = state.lastX + (coords.x - state.lastX) * t + (Math.random() - 0.5) * strokeWidth;
-          var ry = state.lastY + (coords.y - state.lastY) * t + (Math.random() - 0.5) * strokeWidth;
+          var rx = state.lastX + (pos.x - state.lastX) * t + (Math.random() - 0.5) * strokeWidth;
+          var ry = state.lastY + (pos.y - state.lastY) * t + (Math.random() - 0.5) * strokeWidth;
           ctx.globalAlpha = 0.35;
-          ctx.fillRect(rx, ry, 3.5, 3.5);
+          ctx.fillRect(rx, ry, 4, 4);
         }
       } else {
-        // Trazo directo continuo HD sin cortes
         ctx.beginPath();
         ctx.moveTo(state.lastX, state.lastY);
-        ctx.lineTo(coords.x, coords.y);
+        ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
       }
 
-      state.lastX = coords.x;
-      state.lastY = coords.y;
+      state.lastX = pos.x;
+      state.lastY = pos.y;
     }
 
-    function onPointerUp(e) {
+    function endStroke() {
       if (state.isDrawing) {
         state.isDrawing = false;
         saveState();
@@ -637,44 +620,36 @@
       }
     }
 
-    // REGISTRO DIRECTO DE EVENTOS UNIVERSALES
-    // REGISTRO DIRECTO CON PROTECCIÓN TÁCTIL PARA CELULAR
+    // --- ENLACE DUAL INFALIBLE (POINTER EVENTS + TOUCH DIRECTO) ---
+    // 1. Eventos Pointer (Stylus y ratón)
     canvasWrapper.addEventListener('pointerdown', function(e) {
-      e.preventDefault();
-      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
-      onPointerDown(e);
+      startStroke(e.clientX, e.clientY, e.pressure);
     });
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', function(e) {
-      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
-      onPointerUp(e);
+    window.addEventListener('pointermove', function(e) {
+      if (state.isDrawing || state.isPanning) {
+        moveStroke(e.clientX, e.clientY, e.pressure);
+      }
     });
-    window.addEventListener('pointercancel', function(e) {
-      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
-      onPointerUp(e);
-    });
+    window.addEventListener('pointerup', endStroke);
 
-    // Bloqueo de gestos del sistema en pantalla táctil
-    canvasWrapper.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
-    canvasWrapper.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });// REGISTRO DIRECTO CON PROTECCIÓN TÁCTIL PARA CELULAR
-    canvasWrapper.addEventListener('pointerdown', function(e) {
-      e.preventDefault();
-      try { canvasWrapper.setPointerCapture(e.pointerId); } catch(err){}
-      onPointerDown(e);
-    });
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', function(e) {
-      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
-      onPointerUp(e);
-    });
-    window.addEventListener('pointercancel', function(e) {
-      try { if (e && e.pointerId) canvasWrapper.releasePointerCapture(e.pointerId); } catch(err){}
-      onPointerUp(e);
-    });
+    // 2. Eventos Táctiles directos (Dedo en celular Android)
+    canvasWrapper.addEventListener('touchstart', function(e) {
+      if (e.touches && e.touches.length > 0) {
+        var t = e.touches[0];
+        startStroke(t.clientX, t.clientY, 1.0);
+      }
+    }, { passive: true });
 
-    // Bloqueo de gestos del sistema en pantalla táctil
-    canvasWrapper.addEventListener('touchstart', function(e) { e.preventDefault(); }, { passive: false });
-    canvasWrapper.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+    window.addEventListener('touchmove', function(e) {
+      if (state.isDrawing || state.isPanning) {
+        if (e.touches && e.touches.length > 0) {
+          var t = e.touches[0];
+          moveStroke(t.clientX, t.clientY, 1.0);
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', endStroke);
 
     // HISTORIAL DESHACER / REHACER
     function saveState() {
@@ -720,7 +695,7 @@
     document.getElementById('undoBtn').onclick = undo;
     document.getElementById('redoBtn').onclick = redo;
 
-    // BOTONES DE HERRAMIENTAS
+    // BOTONES
     document.querySelectorAll('.tool-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -732,7 +707,7 @@
     document.getElementById('colorPicker').oninput = function(e) { state.color = e.target.value; };
     document.getElementById('brushSize').oninput = function(e) { state.size = e.target.value; };
 
-    // PANEL DE REFERENCIA
+    // REFERENCIA
     var refPanel = document.getElementById('refPanel');
     var refDragHandle = document.getElementById('refDragHandle');
     document.getElementById('toggleRefBtn').onclick = function() { refPanel.classList.toggle('hidden'); };
@@ -749,3 +724,71 @@
           img.style.display = 'block';
           document.getElementById('refPlaceholder').style.display = 'none';
         };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    var isDrag = false, offset = { x: 0, y: 0 };
+    refDragHandle.addEventListener('pointerdown', function(e) {
+      isDrag = true;
+      offset = { x: e.clientX - refPanel.offsetLeft, y: e.clientY - refPanel.offsetTop };
+    });
+    window.addEventListener('pointermove', function(e) {
+      if (!isDrag) return;
+      refPanel.style.left = (e.clientX - offset.x) + 'px';
+      refPanel.style.top = (e.clientY - offset.y) + 'px';
+    });
+    window.addEventListener('pointerup', function() { isDrag = false; });
+
+    // CAPAS
+    document.getElementById('layersBtn').onclick = function() { document.getElementById('layersPanel').classList.toggle('open'); };
+    document.getElementById('addLayerBtn').onclick = addLayer;
+
+    // GUARDADO HD
+    var bookModal = document.getElementById('bookModal');
+    document.getElementById('openBookBtn').onclick = function() {
+      renderBook();
+      bookModal.classList.add('open');
+    };
+    document.getElementById('closeBookModalBtn').onclick = function() { bookModal.classList.remove('open'); };
+
+    document.getElementById('savePageBtn').onclick = function() {
+      var exp = document.createElement('canvas');
+      exp.width = HD_WIDTH;
+      exp.height = HD_HEIGHT;
+      var ctx = exp.getContext('2d');
+      
+      state.layers.forEach(function(l) { ctx.drawImage(l.canvas, 0, 0); });
+      var fullQualityUrl = exp.toDataURL('image/png', 1.0);
+
+      try {
+        var pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
+        pages.unshift({ id: Date.now(), img: fullQualityUrl, date: new Date().toLocaleDateString() });
+        localStorage.setItem('drafty_hd_pages', JSON.stringify(pages.slice(0, 10)));
+      } catch(e) {}
+
+      var a = document.createElement('a');
+      a.download = 'Drafty_HD_' + Date.now() + '.png';
+      a.href = fullQualityUrl;
+      a.click();
+
+      renderBook();
+      alert('¡Hoja guardada en alta resolución (1080p) en tu galería!');
+    };
+
+    function renderBook() {
+      var grid = document.getElementById('bookPagesGrid');
+      var pages = JSON.parse(localStorage.getItem('drafty_hd_pages') || '[]');
+      grid.innerHTML = pages.length ? '' : '<p style="grid-column: span 2; font-size:11px; color:#94A3B8;">El cuaderno está vacío.</p>';
+      pages.forEach(function(p) {
+        var d = document.createElement('div');
+        d.className = 'page-card';
+        d.innerHTML = '<img src="' + p.img + '" /><span style="font-size:10px; color:#64748B;">' + p.date + '</span>';
+        grid.appendChild(d);
+      });
+    }
+
+    addLayer();
+  </script>
+</body>
+</html>
