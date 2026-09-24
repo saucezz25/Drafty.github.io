@@ -73,12 +73,11 @@
       max-width: 92vw;
       max-height: 72vh;
       background: #FFFFFF;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
       border-radius: 16px;
       cursor: crosshair;
       touch-action: none !important;
       transform-origin: center center;
-      transition: transform 0.05s ease-out;
     }
 
     .drawing-layer {
@@ -169,40 +168,39 @@
       border: 2px solid white;
     }
 
-    /* CONTROLES DE ZOOM FLOTANTES */
-    .zoom-controls {
+    /* CONTROLES DE ZOOM Y ROTACIÓN FLOTANTES */
+    .viewport-controls {
       position: absolute;
       right: 15px;
       bottom: 82px;
       background: var(--card-bg);
       backdrop-filter: blur(12px);
-      padding: 4px 10px;
+      padding: 4px 8px;
       border-radius: 22px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.06);
       display: flex;
-      gap: 6px;
+      gap: 4px;
       align-items: center;
       z-index: 45;
       border: 2px solid white;
     }
 
-    .zoom-btn {
+    .view-btn {
       background: transparent;
       border: none;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
       padding: 4px 6px;
       color: var(--text-main);
       font-weight: 700;
     }
 
-    .zoom-badge {
+    .view-badge {
       font-size: 11px;
       font-weight: 600;
       color: var(--pastel-blue-dark);
-      min-width: 38px;
+      padding: 0 4px;
       text-align: center;
-      cursor: pointer;
     }
 
     .color-picker-bubble {
@@ -419,7 +417,7 @@
     <div class="brand">
       <span style="font-size: 22px;">🎨</span>
       <span class="brand-title">Drafty</span>
-      <span id="versionBadge" style="font-size: 11px; background: #D1FAE5; color: #065F46; padding: 2px 7px; border-radius: 12px; font-weight: 600;">v5 Pro 🟢</span>
+      <span id="versionBadge" style="font-size: 11px; background: #D1FAE5; color: #065F46; padding: 2px 7px; border-radius: 12px; font-weight: 600;">v6 Studio 🟢</span>
     </div>
 
     <div class="top-actions">
@@ -454,11 +452,13 @@
     <div id="layersList" style="display:flex; flex-direction:column; gap:4px;"></div>
   </div>
 
-  <!-- CONTROLES DE ZOOM FLOTANTES -->
-  <div class="zoom-controls">
-    <button class="zoom-btn" id="zoomOutBtn" type="button">➖</button>
-    <span class="zoom-badge" id="zoomBadge" title="Toca para resetear">100%</span>
-    <button class="zoom-btn" id="zoomInBtn" type="button">➕</button>
+  <!-- CONTROLES DE ZOOM, ROTACIÓN Y CENTRADO -->
+  <div class="viewport-controls">
+    <button class="view-btn" id="zoomOutBtn" type="button">➖</button>
+    <span class="view-badge" id="zoomBadge">100%</span>
+    <button class="view-btn" id="zoomInBtn" type="button">➕</button>
+    <span style="color:#CBD5E1;">|</span>
+    <button class="view-btn" id="resetViewBtn" type="button" title="Centrar y enderezar hoja">🎯</button>
   </div>
 
   <div class="tool-settings">
@@ -508,13 +508,22 @@
       isDrawing: false,
       lastX: 0,
       lastY: 0,
+      
+      // ESTADO DE TRANSFORMACIÓN COMPLETA
       pan: { x: 0, y: 0 },
       scale: 1.0,
+      angle: 0.0, // Ángulo en radianes
       isPanning: false,
       panStart: { x: 0, y: 0 },
-      isPinching: false,
+
+      // ESTADO DE GESTO CON DOS DEDOS (ZOOM + PAN + ROTATE)
+      isTwoFingering: false,
       initialPinchDist: 0,
-      initialScale: 1.0
+      initialScale: 1.0,
+      initialAngle: 0.0,
+      initialMidPoint: { x: 0, y: 0 },
+      initialPan: { x: 0, y: 0 },
+      initialRotationAngle: 0.0
     };
 
     var canvasViewport = document.getElementById('canvas-viewport');
@@ -523,34 +532,41 @@
     var zoomBadge = document.getElementById('zoomBadge');
 
     function updateTransform() {
-      canvasWrapper.style.transform = 'translate(' + state.pan.x + 'px, ' + state.pan.y + 'px) scale(' + state.scale + ')';
+      canvasWrapper.style.transform = 
+        'translate(' + state.pan.x + 'px, ' + state.pan.y + 'px) ' +
+        'rotate(' + state.angle + 'rad) ' +
+        'scale(' + state.scale + ')';
+      
       zoomBadge.innerText = Math.round(state.scale * 100) + '%';
     }
 
-    // CONTROLES DE ZOOM
-    function zoomIn() {
-      state.scale = Math.min(3.5, Number((state.scale + 0.25).toFixed(2)));
-      updateTransform();
-    }
-    function zoomOut() {
-      state.scale = Math.max(0.5, Number((state.scale - 0.25).toFixed(2)));
-      updateTransform();
-    }
-    function zoomReset() {
+    // RESET COMPLETO DE VISTA (Centrar, enderezar y escala 100%)
+    function resetView() {
       state.scale = 1.0;
+      state.angle = 0.0;
       state.pan = { x: 0, y: 0 };
       updateTransform();
     }
 
-    document.getElementById('zoomInBtn').onclick = zoomIn;
-    document.getElementById('zoomOutBtn').onclick = zoomOut;
-    zoomBadge.onclick = zoomReset;
+    document.getElementById('zoomInBtn').onclick = function() {
+      state.scale = Math.min(4.0, Number((state.scale + 0.25).toFixed(2)));
+      updateTransform();
+    };
+    document.getElementById('zoomOutBtn').onclick = function() {
+      state.scale = Math.max(0.4, Number((state.scale - 0.25).toFixed(2)));
+      updateTransform();
+    };
+    document.getElementById('resetViewBtn').onclick = resetView;
 
-    // ZOOM CON LA RUEDA DEL RATÓN (EN PC)
+    // ZOOM CON RUEDA DEL RATÓN (PC)
     canvasViewport.addEventListener('wheel', function(e) {
       e.preventDefault();
-      if (e.deltaY < 0) zoomIn();
-      else zoomOut();
+      if (e.deltaY < 0) {
+        state.scale = Math.min(4.0, Number((state.scale + 0.15).toFixed(2)));
+      } else {
+        state.scale = Math.max(0.4, Number((state.scale - 0.15).toFixed(2)));
+      }
+      updateTransform();
     }, { passive: false });
 
     function addLayer() {
@@ -560,8 +576,7 @@
       canvas.className = 'drawing-layer';
       var ctx = canvas.getContext('2d');
       
-      // Fondo blanco en la capa base
-      if(state.layers.length === 0) {
+      if (state.layers.length === 0) {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, HD_WIDTH, HD_HEIGHT);
       }
@@ -572,8 +587,7 @@
       setActiveLayer(state.layers.length - 1);
       renderLayersList();
 
-      // ¡ESTO SOLUCIONA EL UNDO! Guarda la hoja en blanco original en el historial
-      saveState();
+      saveState(); // Guarda estado en blanco para poder deshacer la línea 1
     }
 
     function setActiveLayer(idx) {
@@ -601,19 +615,43 @@
       return null;
     }
 
-    // Calcula coordenadas HD exactas independientemente del Zoom o movimiento
+    // --- MOTOR MATEMÁTICO DE COORDENADAS CON ROTACIÓN INVERSA ---
     function getCoords(clientX, clientY) {
-      var rect = canvasWrapper.getBoundingClientRect();
+      var vp = canvasViewport.getBoundingClientRect();
+      var baseCenterX = vp.left + vp.width / 2;
+      var baseCenterY = vp.top + vp.height / 2;
+      var centerX = baseCenterX + state.pan.x;
+      var centerY = baseCenterY + state.pan.y;
+
+      var dx = clientX - centerX;
+      var dy = clientY - centerY;
+
+      // Inversión de ángulo de rotación
+      var cosA = Math.cos(-state.angle);
+      var sinA = Math.sin(-state.angle);
+      var rx = dx * cosA - dy * sinA;
+      var ry = dx * sinA + dy * cosA;
+
+      // Inversión de escala
+      var ux = rx / state.scale;
+      var uy = ry / state.scale;
+
+      var W_disp = canvasWrapper.offsetWidth;
+      var H_disp = canvasWrapper.offsetHeight;
+
+      var cx = ux + (W_disp / 2);
+      var cy = uy + (H_disp / 2);
+
       return {
-        x: (clientX - rect.left) * (HD_WIDTH / rect.width),
-        y: (clientY - rect.top) * (HD_HEIGHT / rect.height)
+        x: cx * (HD_WIDTH / W_disp),
+        y: cy * (HD_HEIGHT / H_disp)
       };
     }
 
-    // --- FUNCIONES CENTRALES DE DIBUJO ---
+    // --- FUNCIONES DE DIBUJO ---
     function startStroke(clientX, clientY, pressure) {
-      if (state.isPinching) return;
-      if (state.isDrawing) return; // Evita el doble disparo (punto gigante)
+      if (state.isTwoFingering) return;
+      if (state.isDrawing) return;
 
       if (state.tool === 'pan') {
         state.isPanning = true;
@@ -626,7 +664,6 @@
       state.lastX = pos.x;
       state.lastY = pos.y;
 
-      // Calibración estricta de presión para evitar picos
       var p = 0.6;
       if (pressure !== undefined && pressure !== null && pressure > 0) {
         p = pressure > 1.0 ? 1.0 : Math.max(0.15, pressure);
@@ -639,14 +676,13 @@
       var strokeWidth = Math.max(3, state.size * 2.2 * p);
       setupContext(ctx, strokeWidth);
 
-      // Trazo del punto inicial proporcionado al grosor
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, strokeWidth / 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
     function moveStroke(clientX, clientY, pressure) {
-      if (state.isPinching) return;
+      if (state.isTwoFingering) return;
 
       if (state.isPanning) {
         state.pan.x = clientX - state.panStart.x;
@@ -714,7 +750,6 @@
         ctx.fillStyle = state.color;
       } else if (state.tool === 'eraser') {
         ctx.globalAlpha = 1.0;
-        // Si es la capa base pinta blanco, si es capa superior borra a transparente
         if (state.currentLayerIdx === 0) {
           ctx.globalCompositeOperation = 'source-over';
           ctx.strokeStyle = '#FFFFFF';
@@ -728,36 +763,73 @@
       }
     }
 
-    // --- MANEJO DE TOQUES Y PINCH-TO-ZOOM ---
+    // --- GESTOS LIBRES CON 2 DEDOS (ZOOM + ROTACIÓN + MOVER LIBREMENTE) ---
     canvasViewport.addEventListener('touchstart', function(e) {
       if (e.touches.length === 2) {
-        // Iniciar pellizco para zoom
+        // Cancelar dibujo si entran dos dedos
         state.isDrawing = false;
         state.isPanning = false;
-        state.isPinching = true;
-        state.initialPinchDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
+        state.isTwoFingering = true;
+
+        var t1 = e.touches[0];
+        var t2 = e.touches[1];
+
+        state.initialPinchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
         state.initialScale = state.scale;
+        state.initialAngle = state.angle;
+        state.initialMidPoint = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+        state.initialPan = { x: state.pan.x, y: state.pan.y };
+        state.initialRotationAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
         return;
       }
 
-      if (e.touches.length === 1 && !state.isPinching) {
+      if (e.touches.length === 1 && !state.isTwoFingering) {
         var t = e.touches[0];
         startStroke(t.clientX, t.clientY, 0.6);
       }
     }, { passive: false });
 
     window.addEventListener('touchmove', function(e) {
-      if (state.isPinching && e.touches.length === 2) {
+      if (state.isTwoFingering && e.touches.length === 2) {
         e.preventDefault();
-        var currentDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        var factor = currentDist / state.initialPinchDist;
-        state.scale = Math.min(3.5, Math.max(0.5, Number((state.initialScale * factor).toFixed(2))));
+
+        var t1 = e.touches[0];
+        var t2 = e.touches[1];
+
+        // 1. DESPLAZAMIENTO (Subir, bajar, izquierda, derecha)
+        var currentMid = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+        state.pan.x = state.initialPan.x + (currentMid.x - state.initialMidPoint.x);
+        state.pan.y = state.initialPan.y + (currentMid.y - state.initialMidPoint.y);
+
+        // 2. ZOOM (Acercar y alejar)
+        var currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        var scaleFactor = currentDist / state.initialPinchDist;
+        state.scale = Math.min(4.0, Math.max(0.4, Number((state.initialScale * scaleFactor).toFixed(2))));
+
+        // 3. ROTACIÓN DEL LIENZO
+        var currentRotationAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+        var deltaAngle = currentRotationAngle - state.initialRotationAngle;
+        var rawAngle = state.initialAngle + deltaAngle;
+
+        // Imán de alineación inteligente (Snapping a 0°, 90°, 180°, 270°)
+        var deg = (rawAngle * 180 / Math.PI) % 360;
+        if (deg < 0) deg += 360;
+        var snapTargets = [0, 90, 180, 270, 360];
+        var snapped = rawAngle;
+        for (var i = 0; i < snapTargets.length; i++) {
+          if (Math.abs(deg - snapTargets[i]) < 4.0) {
+            snapped = (snapTargets[i] * Math.PI) / 180;
+            break;
+          }
+        }
+        state.angle = snapped;
+
         updateTransform();
         return;
       }
@@ -771,11 +843,15 @@
     }, { passive: false });
 
     window.addEventListener('touchend', function(e) {
-      if (e.touches.length < 2) state.isPinching = false;
-      if (e.touches.length === 0) endStroke();
+      if (e.touches.length < 2) {
+        state.isTwoFingering = false;
+      }
+      if (e.touches.length === 0) {
+        endStroke();
+      }
     });
 
-    // Soporte para lápiz stylus (S-Pen) y ratón
+    // Soporte Stylus y ratón en PC
     canvasWrapper.addEventListener('pointerdown', function(e) {
       if (e.pointerType !== 'touch') {
         startStroke(e.clientX, e.clientY, e.pressure);
@@ -847,13 +923,12 @@
     document.getElementById('redoBtn').onclick = redo;
     document.getElementById('clearBtn').onclick = clearCurrentLayer;
 
-    // Atajos de teclado Z e Y
     window.addEventListener('keydown', function(e) {
       if (e.key.toLowerCase() === 'z') undo();
       if (e.key.toLowerCase() === 'y') redo();
     });
 
-    // BOTONES DE HERRAMIENTAS
+    // HERRAMIENTAS
     document.querySelectorAll('.tool-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -865,7 +940,7 @@
     document.getElementById('colorPicker').oninput = function(e) { state.color = e.target.value; };
     document.getElementById('brushSize').oninput = function(e) { state.size = e.target.value; };
 
-    // PANEL DE REFERENCIA
+    // FOTO REFERENCIA
     var refPanel = document.getElementById('refPanel');
     var refDragHandle = document.getElementById('refDragHandle');
     document.getElementById('toggleRefBtn').onclick = function() { refPanel.classList.toggle('hidden'); };
@@ -902,7 +977,7 @@
     document.getElementById('layersBtn').onclick = function() { document.getElementById('layersPanel').classList.toggle('open'); };
     document.getElementById('addLayerBtn').onclick = addLayer;
 
-    // GUARDADO HD Y LIBRO
+    // GUARDADO HD
     var bookModal = document.getElementById('bookModal');
     document.getElementById('openBookBtn').onclick = function() {
       renderBook();
@@ -946,7 +1021,6 @@
       });
     }
 
-    // Iniciar con Capa Base y estado en blanco
     addLayer();
   </script>
 </body>
